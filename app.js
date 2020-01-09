@@ -53,6 +53,9 @@ const userSchema = new mongoose.Schema({
     },
     twitterId: {
       type: String
+    },
+    secret: {
+      type: String
     }
 });
 
@@ -108,7 +111,7 @@ passport.use(new TwitterStrategy({
     callbackURL: "http://localhost:3000/auth/twitter/secrets"
   },
   function(token, tokenSecret, profile, done) {
-    console.log(profile);
+    // console.log(profile);
 
     User.findOrCreate({ twitterId: profile.id }, function(err, user) {
       if (err) { return done(err); }
@@ -128,7 +131,7 @@ app.get('/auth/facebook',
   passport.authenticate('facebook', { scope: ['public_profile'] }));
 
 app.get('/auth/twitter',
-  passport.authenticate('twitter')/*, { scope: ["profile"] }*/);
+  passport.authenticate('twitter')/*, { scope: ["profile"] }*/);  //scope not working.
 
 app.get("/auth/google/secrets", 
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -160,11 +163,43 @@ app.get('/register', (req, res) => {
 });
 
 app.get("/secrets", function (req, res) {
-    if (req.isAuthenticated()) {
-        res.render("secrets");
+  User.find({"secret": {$ne: null}}, function(err, foundUsers) {
+    if (err) {
+      console.log(err);
+    } else if (foundUsers) {
+      res.render("secrets", {userWithSecrets: foundUsers});
     } else {
-        res.redirect("/login");
+      console.log("User not found.");
+      res.redirect("/login");
     }
+  });
+});
+
+app.get("/submit", function(req, res) {
+  if (req.isAuthenticated()) {
+    res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.post("/submit", function (req, res) {
+  const submittedSecrete = req.body.secret;
+  console.log(req.user);
+
+  User.findById(req.user.id, function(err, foundUser) {
+    if(err) {
+      console.log(err);
+    } else if(foundUser) {
+      foundUser.secret = submittedSecrete;
+      foundUser.save(function() {
+        res.redirect("/secrets");
+      });
+    } else {
+      console.log("User not found");
+      res.redirect("/login");
+    }
+  });
 });
 
 app.get('/logout', (req, res) => {
