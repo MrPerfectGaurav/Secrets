@@ -10,6 +10,7 @@ const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
+const TwitterStrategy = require('passport-twitter').Strategy;
 const findOrCreate = require('mongoose-findorcreate');
 const port = 3000;
 
@@ -49,6 +50,9 @@ const userSchema = new mongoose.Schema({
     },
     facebookId: {
         type: String
+    },
+    twitterId: {
+      type: String
     }
 });
 
@@ -73,7 +77,7 @@ passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "http://localhost:3000/auth/google/secrets",
-    // userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
   },
   function(accessToken, refreshToken, profile, cb) {
     // console.log(profile._json.name);
@@ -90,10 +94,25 @@ passport.use(new FacebookStrategy({
     callbackURL: "http://localhost:3000/auth/facebook/secrets"
   },
   function(accessToken, refreshToken, profile, cb) {
-      console.log(profile);
+      // console.log(profile);
 
     User.findOrCreate({ facebookId: profile.id }, function (err, user) {
       return cb(err, user);
+    });
+  }
+));
+
+passport.use(new TwitterStrategy({
+    consumerKey: process.env.TWITTER_CONSUMER_KEY,
+    consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
+    callbackURL: "http://localhost:3000/auth/twitter/secrets"
+  },
+  function(token, tokenSecret, profile, done) {
+    console.log(profile);
+
+    User.findOrCreate({ twitterId: profile.id }, function(err, user) {
+      if (err) { return done(err); }
+      done(null, user);
     });
   }
 ));
@@ -103,11 +122,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile'] })
-);
+  passport.authenticate('google', { scope: ['profile'] }));
 
 app.get('/auth/facebook',
   passport.authenticate('facebook', { scope: ['public_profile'] }));
+
+app.get('/auth/twitter',
+  passport.authenticate('twitter')/*, { scope: ["profile"] }*/);
 
 app.get("/auth/google/secrets", 
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -119,7 +140,14 @@ app.get("/auth/google/secrets",
 app.get('/auth/facebook/secrets',
   passport.authenticate('facebook', { failureRedirect: '/login' }),
   function(req, res) {
-    // Successful authentication, redirect home.
+    // Successful authentication, redirect to secrets.
+    res.redirect('/secrets');
+});
+
+app.get('/auth/twitter/secrets',
+  passport.authenticate('twitter', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect to secrets.
     res.redirect('/secrets');
 });
 
